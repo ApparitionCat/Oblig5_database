@@ -47,65 +47,34 @@ class Disney
       *                  "As Rhodey in Iron Man (2008)")
       *               )
       */
-    public function getActorStatistics()
+    public function getActorStatistics()  //check the Disney.xml file to get context on the comments
     {
-        $x = array();
-		$y = array();
-		$ActorCastList = array();
-		$ActorList = array();
+        $x = array(); //array initialisation
 		
-		
-
-		$ActStat = $this->xpath->query('Actors')->item(0);  //points to the actors element 
-		$Act = $ActStat->childNodes;   		//points to the child node array of the actors, an array of all actor elements
-		/*
-		$ActStat1 = $Act->childNodes[0];     //should point to the actor's first child node, which is name
-		$Act1 = $ActStat1->childNodes;       //points to the name element's text node
-		$ActName = $Act1.nodeValue;           //actname now holds teh text value of the text node of the name element
-		*/
-		$Mov = $this->xpath->query('Subsidiaries')->item(0); 
-		$Mov1 = $Mov->firstChild;
-		
-		
-		foreach($Mov1 as $castRole){
-			if ($castRole->nodeType == XML_ELEMENT_NODE) {      
-               $y .= "{$castRole->getAttribute('id')}\n"; 
+		$Act = $this->xpath->query('Actors/Actor');               //this is a query that fetches or "points" to the actor elements,
+                                                                  // do note that this is classed as the DOMNodeList class because the query returns a list of every element that matches the query search
+		foreach($Act as $actor) {                                 //this loop goes trough each node of the $Act list of nodes and sets them as "$actor"
+               $actorId = $actor->getAttribute('id');             //this gets the attribute 'id' from the current node, this is used below
+			 
+			   $x[$actorId] = array();                            //this creates a new array inside the $x array, the "box" (marked with the actors id "$actorId" inside $x array now contains an empty array
+			   
+		       $RoleNodes = $this->xpath->query("Subsidiaries/Subsidiary/Movie/Cast/Role[@actor = '$actorId']");       //this fetches a list of nodes that matches the query, here its finds roles of the actors using $actorId
+		        foreach($RoleNodes as $RoleElement){                                                                   //goes trough each role that the actors have played
+                    $rolesName = "{$RoleElement->getAttribute('name')}";       //because $RoleNodes returned a list of the Role elements that has actor attribute = $actorId, $rolesName will get the name attribute of Role element
+					
+					$movieNodeN = $RoleElement->parentNode->parentNode->getElementsByTagName("Name")->item(0); //here we return to the Movie element by using parentNode twice and then get the Name value of Movie element
+					$moviesName = $movieNodeN->nodeValue; //because the lists we have used are all DOMnodeList or DOMElement(like $movieNodeN) we have to convert it to string, and nodeValue does just that (returns value of node)
+					                                      //Notice: the reason ->item(0) has to be used is because if not, $movieNodeN would be a list, not a single element, and foreach loops aleready do make lists into singles
+														  
+					$movieNodeY = $RoleElement->parentNode->parentNode->getElementsByTagName("Year")->item(0); //the same as above but instead of "Name" but with "Year" instead
+					$movieYear = $movieNodeY->nodeValue;                                                       //$movieYear becomes a int var because thats what nodeValue returns here
+					
+					$x[$actorId][] = "As $rolesName in $moviesName ($movieYear)";                              //the "boxes" marked with $actorId have their arrays filled with this string contructed with moviename and year
+		        }
            }
-		}
-		
- 
-		foreach($Act as $actor) {
-           if ($actor->nodeType == XML_ELEMENT_NODE) {      
-               $x .= "{$actor->getAttribute('id')}\n"; 
-           }
-		   
-       }
-	   /*
-	    for ($i = 0; $i < $x.length; $i++){
-			foreach($Mov1 as $Role1){                          //cant have foreach in for loop
-				if($CastRole->getAttribute('actor') == $x.[i])
-					$ActorCastList[i] .= "{$CastRole->getAttribute('name')}\n"
-			}
-		}
-	   
-	   
-	   for ($i = 0; $i < $x.length; $i++){
-		   ActorCastList[$x.[i]]=array(
-		   $ActorCastList[i]
-		   
-		   );
-
-	   }
-	   
-	   
-	   */
-	   
-	   
-	   
         //To do:
-        // Implement functionality as specified
-
-        print_r($y);
+        // Implement functionality as specified  -- DONE! :D
+        print_r($x);
     }
 
     /**
@@ -113,10 +82,24 @@ class Disney
       * played in any of the movies in $doc - i.e., their id's do not appear
       * in any of the Movie/Cast/Role/@actor attributes in $doc.
       */
-    public function removeUnreferencedActors()
+    public function removeUnreferencedActors()   //some of the code is ripped from the previous function
     {
+		$compName = $this->xpath->query('Actors/Actor');                                                          //query actor
+		$domElemsToRemove = array();                                                                              //initialise array
+		
+		foreach($compName as $Aname){                                                                             //for each of the nodes in $compName
+			$Compare = $Aname->getAttribute('id');                                                                //get the actor id
+			$RoleNodesCopy = $this->xpath->query("Subsidiaries/Subsidiary/Movie/Cast/Role[@actor = '$Compare']"); //query all roles with the actorid as actor in roles
+			$AllRoles = count ($RoleNodesCopy);                                                                   //now count the amount of nodes in $RoleNodesCopy
+			if($AllRoles == 0){                                                                                   //if it is 0 (if the actor has no roles)
+				 $domElemsToRemove[] = $Aname;                                                                    //the actor object is put into an array
+			}
+		}
+		foreach( $domElemsToRemove as $domElement ){ 
+            $domElement->parentNode->removeChild($domElement);                                                    //for each actor role in this array, delete them
+        }                                                                                                         //the reason why we cant delete them straight away is because $domElemsToRemove is a list, not single elements
         //To do:
-        // Implement functionality as specified
+        // Implement functionality as specified -- DONE! :D
 
     }
 
@@ -130,10 +113,16 @@ class Disney
       * @param String $roleAlias    The role's alias (optional)
       */
     public function addRole($subsidiaryId, $movieName, $movieYear, $roleName,
-                            $roleActor, $roleAlias = null)
+                            $roleActor, $roleAlias = null)   //these are variables inherited from the test file, we have to use these, but not all of them, to add new role.
     {
-        //To do:
-        // Implement functionality as specified
+		
+		$SetNewHere = $this->xpath->query("Subsidiaries/Subsidiary/Movie[Name[contains(text(),'$movieName')]]/Cast")->item(0);    //queiries a movie which has the name inside $moviename
+		$NewEl = $this->doc->createElement('Role', '');                                                //creates a new element, you have to use $this->doc as its the object that holds the informastion of teh disney.xml file
+		$NewEl->setAttribute("name", "$roleName");                                                     //sets attribute, the first argument is what type it is and the next is what the attribute contains
+		$NewEl->setAttribute("actor", "$roleActor");                                                   //sets teh second attribute
+		$SetNewHere->appendChild($NewEl);                                                              //append child adds a nide (in this case the node we created) into the node's childnode list
+        //To do:                                                                                       //IMPORTANT NOTE: $SetNewHere is actually a DOMNodeList, so we have to put ->item(index) to make it a single element
+        // Implement functionality as specified                                                        //because appentChild will not work for DOMNodeList, only for DOMElement.
 
     }
 }
